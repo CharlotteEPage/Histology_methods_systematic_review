@@ -1,0 +1,311 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+02_Coral_histopathology_methodologies
+
+Code produces plots for Figure 4 (n.b plots further edited in Adobe Illustrator):
+- Study aim 
+- Sample type 
+- Data type 
+- Examination categories for histopath (split into other associated orgs, host qualitative/quantitative)
+- Disease by other associated org plot (sankey)
+- Disease by other host terminology plot (sankey)
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(MetBrewer)
+library(stringr)
+library(circlize)
+library(ggalluvial)
+
+data <- read.csv("Data_collection_cleaned_cleaned.csv")
+
+data_2 <- read.csv("V3_data_collection_cleaned.csv")
+
+str(data)
+
+reorder_size <- function(x) {
+        factor(x, levels = names(sort(table(x), decreasing = TRUE)))
+}
+
+```
+
+
+Study aim for histology (made into venn diagram in illustrator)
+
+```{r}
+
+ggplot(data, aes(x = reorder_size(Focus))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Aim") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.8,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.7), size = 2.2) + 
+  coord_flip()
+          
+```
+
+Assessment of sample type  (made into venn diagram in illustrator)
+
+```{r}
+
+sample_type <- data %>% 
+  select(Title,Publication_year,Sample_types) %>%
+  separate(sep = ",", col = Sample_types, into = c("x1","x2","x3","x4","x5")) %>%
+  gather(key,value,3:7) %>%
+  na.omit() %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Full plot
+  
+ ggplot(sample_type, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.8,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.7), size = 2.2)+
+   coord_flip()
+          
+ 
+ggplot(data, aes(x = reorder_size(Sample_types))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.8,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.7), size = 2.2)+
+   coord_flip()
+
+```
+
+Data type (made into venn diagram in illustrator)
+
+```{r}
+
+data_type <- data %>% 
+  select(Title,Publication_year,Data_type_2) %>%
+  separate(sep = ",", col = Data_type_2, into = c("x1","x2")) %>%
+  gather(key,value,3:4) %>%
+  na.omit() %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Full plot
+  
+ ggplot(data_type, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.8,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.7), size = 2.2)+
+   coord_flip()
+ 
+ # Full plot
+  
+ ggplot(data, aes(x = reorder_size(Data_type_2))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.8,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.7), size = 2.2)+
+   coord_flip()
+
+```
+
+What was examined?
+
+```{r}
+
+examined<- data %>% 
+  select(Title,Publication_year,Examined) %>%
+  separate(sep = ",", col = Examined, into = c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","x12","x13","x14","x15","x16","x17","x18","x19","x20","x21","x22","x23","x24","x25","x26")) %>%
+  gather(key,value,3:28) %>%
+  group_by(value) %>% 
+  na.omit() %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Filter out those with "associated" 
+
+examined_associated <- examined %>% filter(grepl("Associated",value)) %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Full plot
+  
+ ggplot(examined, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.4,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.3), size = 2.2)
+
+# Full plot
+  
+ ggplot(examined_associated, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.5,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.4), size = 2.2)
+   
+```
+
+
+```{r}
+
+examined_host <- examined %>% filter(!grepl("Associated",value)) %>% 
+  mutate(across(where(is.character),str_trim)) %>% 
+  na.omit()
+
+# Full plot
+  
+ ggplot(examined_host, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.5,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.4), size = 2.2)
+
+```
+
+Quantitative assessments 
+
+```{r}
+
+data$Quantiative
+quantitative <- data %>% 
+  select(Title,Publication_year,Quantiative) %>%
+  separate(sep = ",", col = Quantiative, into = c("x1","x2","x3")) %>%
+  gather(key,value,3:5) %>%
+  group_by(value) %>% 
+  na.omit() %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Filter out those with no value
+
+# Full plot
+  
+ ggplot(quantitative, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.3,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.3), size = 2.2)
+
+```
+
+# Seperate out diseases 
+
+```{r}
+disease <- data %>% group_by(Disease_type) %>% count(Disease_type)
+
+# Seperate Disease_type by host examination , and then put it into long format
+
+disease_type <- data %>% select(Title,Publication_year,Examined, Disease_type) %>%
+  separate(sep = ",", col = Disease_type, into = c("Disease_type_1","Disease_type_2")) %>%
+  gather(key,value,4:5) %>%
+  na.omit() %>% 
+  group_by(value) 
+
+```
+
+
+```{r}
+
+# Seperate Disease_type by other organisms examined, and then put it into long format
+
+disease_type <- data %>% select(Title,Publication_year,Examined, Disease_type) %>%
+  separate(sep = ",", col = Disease_type, into = c("Disease_type_1","Disease_type_2")) %>%
+  gather(key,value,4:5) %>%
+  na.omit() %>% 
+  group_by(value) 
+
+colnames(disease_type)[colnames(disease_type) == "value"] ="disease_type"
+
+examined_disease <- disease_type %>% 
+  dplyr::select(Title,Publication_year,disease_type,Examined) %>%
+  separate(sep = ",", col = Examined, into = c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","x12","x13","x14","x15","x16","x17","x18","x19","x20","x21","x22","x23","x24","x25","x26","x27")) %>%
+  gather(key,value,4:30) %>%
+  group_by(value) %>% 
+  na.omit() %>% 
+  mutate(across(where(is.character), str_trim))
+
+
+# Filter out associated organisms (host only)
+
+examined_host_disease <- examined_disease %>% filter(!grepl("Associated",value)) %>% 
+  mutate(across(where(is.character),str_trim)) %>% 
+  na.omit()
+
+# Filter out associated organisms 
+
+examined_associated_disease <- examined_disease %>% filter(grepl("Associated",value)) %>% 
+  mutate(across(where(is.character), str_trim))
+
+```
+
+Sankey diagrams!
+
+Host condition/reproduction
+```{r}
+# Calculate frequency 
+
+examined_host_disease_freq <-  examined_host_disease%>%
+  group_by(disease_type,value) %>%
+  count() %>%
+  na.omit()
+
+# Make a colour list for diseases 
+
+colour <- c()
+
+ggplot(examined_host_disease_freq, aes(y = n,axis1 = disease_type, axis2 = value)) +
+  geom_alluvium() +
+  geom_stratum() +
+ geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_fill_manual(values = colors) +
+  #scale_x_continuous(breaks = 1:3, labels = c("Hair", "Eye", "Sex")) +
+  #coord_flip() +
+  theme_void()
+
+
+
+```
+
+Other associated organisms 
+
+```{r}
+# Calculate frequency 
+
+examined_other_disease_freq <- examined_associated_disease %>%
+  group_by(disease_type,value) %>%
+  count() %>%
+  na.omit()
+
+# Make a colour list for diseases 
+
+colour <- c()
+
+ggplot(examined_other_disease_freq, aes(y = n,axis1 = disease_type, axis2 = value)) +
+  geom_alluvium() +
+  geom_stratum() +
+ geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_fill_manual(values = colors) +
+  #scale_x_continuous(breaks = 1:3, labels = c("Hair", "Eye", "Sex")) +
+  #coord_flip() +
+  theme_void()
+
+```
+
+

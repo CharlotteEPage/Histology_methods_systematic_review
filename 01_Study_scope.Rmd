@@ -1,0 +1,300 @@
+---
+title: "01_Study_scope"
+output: html_notebook
+---
+
+01_Study_scope
+
+Code produces plots for Figure 3 (n.b plots further edited in Adobe Illustrator):
+- Diseases studied 
+- Genera studied (by disease)
+- Type of study (field or experimental)
+- Other parameters recorded (environmental)
+- Other methods used to study coral disease 
+- Study locations 
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(MetBrewer)
+library(stringr)
+library(circlize)
+library(ggalluvial)
+
+data <- read.csv("Data_collection_cleaned_cleaned.csv")
+
+data_2 <- read.csv("V3_data_collection_cleaned.csv")
+
+str(data)
+
+reorder_size <- function(x) {
+        factor(x, levels = names(sort(table(x), decreasing = TRUE)))
+}
+
+```
+Disease type 
+
+```{r}
+disease <- data %>% group_by(Disease_type) %>% count(Disease_type)
+
+# Seperate Disease_type by , and then put it into long format
+
+disease_type <- data %>% select(Title,Publication_year, Disease_type) %>%
+  separate(sep = ",", col = Disease_type, into = c("Disease_type_1","Disease_type_2")) %>%
+  gather(key,value,3:4) %>%
+  na.omit() %>% 
+  group_by(value) 
+
+# Proportions bar charts
+ggplot(disease_type, aes(x = reorder_size(`value`))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Disease name") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+
+
+```
+Disease genera combinations 
+
+```{r}
+species <- data %>% group_by(Taxa_count) %>% count(Taxa_count)
+
+ggplot(species, aes(Taxa_count,n)) +
+  geom_col() + 
+  theme_bw() 
+
+# Pull out species studied 
+
+test <- data %>% 
+  select(Title,Publication_year,Disease_genera_1) %>%
+  separate(sep = ";", col = Disease_genera_1, into = c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","x12",
+                                                     "x13","x14","x15","x16","x17","x18","x19","x20","x21","x22","x23","x24","x25","26")) %>%
+  gather(key,value,3:28) %>%
+  group_by(value) %>%
+  separate(sep = ",", col = value, into = c("y1","y2"))
+           
+test2 <- test %>% 
+  na.omit() #%>% 
+  #filter(!row_number() %in% c(36:58,60:70,73:75,77,79:82))
+
+test3 <- test2 %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Full plot
+  
+ ggplot(test3, aes(x = reorder_size(y2))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+ 
+ 
+ # Full plot
+  
+ ggplot(test3, aes(x = reorder_size(y1), fill = y2)) +
+        geom_bar() +
+        xlab("Genera") +
+   theme_bw() +
+     theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+   
+        
+```
+
+
+Study type 
+
+```{r}
+studytype <- data %>% group_by(Study_type) %>% count(Study_type)
+
+ggplot(studytype, aes(Study_type,n)) +
+  geom_col() + 
+  theme_bw()
+
+View(study_type_data)
+
+# Donut plot here
+
+study <- data %>% group_by(Study_type) %>% count(Study_type)
+
+# Compute percentages
+study$fraction <- study$n / sum(study$n)
+
+# Compute the cumulative percentages (top of each rectangle)
+study$ymax <- cumsum(study$fraction)
+
+# Compute the bottom of each rectangle
+study$ymin <- c(0, head(study$ymax, n=-1))
+
+# Compute label position
+study$labelPosition <- (study$ymax + study$ymin) / 2
+
+# Compute a good label
+study$label <- paste0(study$Study_type, "\n value: ", study$count)
+
+# Make the plot
+ggplot(study, aes(ymax=ymax,ymin=ymin,xmax=4,xmin=3,fill=Study_type)) +
+  geom_rect() +
+  geom_text(x=2, aes(y=labelPosition, label=Study_type, color=Study_type, size=6)) + 
+  scale_fill_manual(values=c("orchid4","plum3","orchid2")) +
+  scale_color_manual(values=c("orchid4","plum3","orchid2")) +
+  coord_polar(theta="y") +
+  xlim(c(-1, 4)) +
+  theme_void() 
+
+
+```
+
+
+Other environmental parameters recorded in field studies 
+
+```{r}
+
+# Specific to field 
+
+studytype_field <- data %>% filter(Study_type == "Field") 
+
+studytype_field <- data %>% filter(Study_type == "Field") %>%
+  select(Title,Publication_year,Study_type, Environmental_parameters) %>%
+  separate(sep = ",", col = Environmental_parameters, into = c("Env1","Env2")) %>%
+  gather(key,value,4:5) %>%
+  group_by(value) %>%
+  na.omit()
+
+ggplot(studytype_field, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "plum3", colour = "darkmagenta", alpha = 0.8) +
+        xlab("Environmental parameters") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.7,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.6), size = 2.2)
+  
+```
+Other methods used by field and experimental studies
+
+```{r}
+
+other_data <- data %>%
+  select(Title,Publication_year,Other_methods) %>%
+  separate(sep = ";", col = Other_methods, into = c("x1","x2")) %>%
+  gather(key,value,3:4) %>%
+  group_by(value) %>%
+  na.omit()
+  
+# By study type 
+
+other_data <- data %>% filter(Study_type == "Field")  %>%
+  select(Title,Publication_year,Other_methods) %>%
+  separate(sep = ";", col = Other_methods, into = c("x1","x2")) %>%
+  gather(key,value,3:4) %>%
+  group_by(value) %>%
+  na.omit()
+
+other_data_1 <- other_data %>% 
+  mutate(across(where(is.character), str_trim))
+
+ggplot(other_data_1, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "plum3", colour = "darkmagenta", alpha = 0.8) +
+        xlab("Other data") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+
+
+# By study type 
+
+other_data_2 <- data %>% filter(Study_type == "Experimental (lab)")  %>%
+  select(Title,Publication_year,Other_methods) %>%
+  separate(sep = ";", col = Other_methods, into = c("x1","x2")) %>%
+  gather(key,value,3:4) %>%
+  group_by(value) %>%
+  na.omit()
+
+other_data_3 <- other_data_2 %>% 
+  mutate(across(where(is.character), str_trim))
+
+ggplot(other_data_3, aes(x = reorder_size(value))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "orchid4", colour = "darkorchid4", alpha = 0.8) +
+        xlab("Other data") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+
+
+```
+
+
+```{r}
+
+species <- data %>% group_by(Taxa_count) %>% count(Taxa_count)
+
+ggplot(species, aes(Taxa_count,n)) +
+  geom_col() + 
+  theme_bw() 
+
+# Pull out species studied 
+
+test <- data %>% 
+  select(Title,Publication_year,Disease_genera_1) %>%
+  separate(sep = ";", col = Disease_genera_1, into = c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","x12",
+                                                     "x13","x14","x15","x16","x17","x18","x19","x20","x21","x22","x23","x24","x25","26")) %>%
+  gather(key,value,3:28) %>%
+  group_by(value) %>%
+  separate(sep = ",", col = value, into = c("y1","y2"))
+           
+test2 <- test %>% 
+  na.omit() #%>% 
+  #filter(!row_number() %in% c(36:58,60:70,73:75,77,79:82))
+
+test3 <- test2 %>% 
+  mutate(across(where(is.character), str_trim))
+
+# Full plot
+  
+ ggplot(test3, aes(x = reorder_size(y2))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+ 
+ 
+ # Full plot
+  
+ ggplot(test3, aes(x = reorder_size(y1), fill = y2)) +
+        geom_bar() +
+        xlab("Genera") +
+   theme_bw() +
+     theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+   
+        
+  
+```
+
+Location of sampling 
+
+```{r}
+
+data$Study_location_reef_area
+
+
+ ggplot(data, aes(x = reorder_size(Study_location_reef_area))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Genera") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2) +
+   coord_flip()
+
+```
+
+

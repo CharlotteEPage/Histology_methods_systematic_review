@@ -1,0 +1,226 @@
+---
+title: "00_Overview_of_review_data"
+output: html_notebook
+---
+
+00_Overview_of_review_data 
+
+Code produces plots for Figure 2 (n.b plots further edited in Adobe Illustrator):
+- Proportion of pronouns specified 
+- Author institution affiliations 
+- Number of publications per author 
+- Number of publications over time 
+
+
+```{r}
+
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(MetBrewer)
+library(stringr)
+library(circlize)
+library(ggalluvial)
+library(ggvenn)
+library(VennDiagram)
+
+data <- read.csv("Data_collection_cleaned_cleaned.csv")
+
+data_2 <- read.csv("V3_data_collection_cleaned.csv")
+
+str(data)
+
+reorder_size <- function(x) {
+        factor(x, levels = names(sort(table(x), decreasing = TRUE)))
+}
+
+```
+
+
+Number of publications over time 
+
+
+```{r}
+
+years <- data %>% group_by(Publication_year) %>% count(Publication_year)
+
+ggplot (years, aes(Publication_year,n)) +
+  geom_col(fill = "pink1", colour = "pink2", alpha = 0.8) + 
+  scale_x_continuous(breaks = seq(1984,2023,1), guide = guide_axis(angle = 90)) + 
+  scale_y_continuous(breaks = seq(0,6,1)) +
+  theme_bw() 
+  
+```
+Tidy data from new extraction form:
+
+```{r}
+
+str(data_2)
+
+data_2$Last_author.
+
+authors_country <- data_2 %>% 
+  select(Title,Publication_year,X.Author_1,Author_2.,Last_author.) %>%
+  separate(sep = ",", col = X.Author_1, into = c("Author_1","Prounoun_1","Country_1")) %>%
+  separate(sep = ",", col = Author_2., into = c("Author_2","Prounoun_2","Country_2")) %>%
+  separate(sep = ",", col = Last_author., into = c("Author_3","Prounoun_3","Country_3")) 
+
+# Gather columns 
+
+authors_pronoun_gathered <- authors_country %>%
+  gather(key = "Author_pronoun",value = "Pronoun",c(4,7,10)) %>%
+  select(Author_pronoun,Pronoun)
+
+authors_country_gathered <- authors_country %>%
+  gather(key = "Author_country",value = "Country",c(5,8,11)) %>%
+  select(Author_country,Country)
+
+author_name_gathered <- authors_country%>%
+  gather(key = "Author_name",value = "Name",c(3,6,9))  %>%
+  select(Author_name,Name)
+
+biblio_data <- cbind(authors_pronoun_gathered,authors_country_gathered)
+
+bibio_data_final <- cbind(biblio_data,author_name_gathered) %>%
+  na.omit()
+
+```
+
+
+Who is publishing?
+
+```{r}
+
+str(bibio_data_final) 
+
+as.factor
+
+bibio_data_final %>% group_by(Pronoun) %>% count(Pronoun) %>%
+ggplot(aes(x =reorder_size(Pronoun),y = n)) +
+  geom_col() + 
+  theme_bw()
+
+# Stats to understand whether those that don't identify are from developed or developing countries 
+
+bibio_data_final_country <- bibio_data_final %>% group_by(Pronoun,Country) %>% count(Pronoun) 
+
+ggplot(bibio_data_final, aes(x = reorder_size(`Pronoun`))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Pronoun") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+
+# Donut 
+
+bibio_counts_pronoun <- bibio_data_final %>% group_by(Pronoun) %>% count(Pronoun)
+
+# Compute percentages
+bibio_counts_pronoun$fraction <- bibio_counts_pronoun$n / sum(bibio_counts_pronoun$n)
+
+# Compute the cumulative percentages (top of each rectangle)
+bibio_counts_pronoun$ymax <- cumsum(bibio_counts_pronoun$fraction)
+
+# Compute the bottom of each rectangle
+bibio_counts_pronoun$ymin <- c(0, head(bibio_counts_pronoun$ymax, n=-1))
+
+# Compute label position
+bibio_counts_pronoun$labelPosition <- (bibio_counts_pronoun$ymax + bibio_counts_pronoun$ymin) / 2
+
+# Compute a good label
+bibio_counts_pronoun$label <- paste0(bibio_counts_pronoun$Pronoun, "\n value: ", bibio_counts_pronoun$count)
+
+# Make the plot
+ggplot(bibio_counts_pronoun, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=Pronoun)) +
+  geom_rect() +
+  geom_text( x=2, aes(y=labelPosition, label=label, color=Pronoun), size=6) + # x here controls label position (inner / outer)
+  scale_fill_brewer(palette=3) +
+  scale_color_brewer(palette=3) +
+  coord_polar(theta="y") +
+  xlim(c(-1, 4)) +
+  theme_void() +
+  theme(legend.position = "none")
+
+```
+Authors 
+
+```{r}
+
+bibio_data_final$Name
+
+ggplot(bibio_data_final, aes(x = reorder_size(`Name`))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Author name") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion", breaks = seq(0,0.6,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.5), size = 2.2)
+
+name_counts <- bibio_data_final %>% count(Name) 
+
+write.csv(name_counts,"name_counts.csv")
+
+# frequency 
+
+ggplot(name_counts, aes(x = reorder_size(`n`))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Number of publications per author") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion of first, second and last authors", breaks = seq(0,1,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.9), size = 2.2)
+
+```
+Author country 
+
+```{r}
+
+country_counts <- bibio_data_final %>% count(Country) 
+
+sum(country_counts$n)
+
+write.csv(name_counts,"name_Country.csv")
+
+# frequency 
+remove_spces<- bibio_data_final %>% 
+  mutate(across(where(is.character), str_trim))
+
+ggplot(remove_spces, aes(x = reorder_size(`Country`))) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), fill = "pink1", colour = "pink2", alpha = 0.8) +
+        xlab("Author institution country") +
+        scale_y_continuous(labels = scales::percent, name = "Proportion of first, second and last authors", breaks = seq(0,0.7,0.1)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_label(stat = 'count', aes(label = ..count..), position = position_fill(vjust =0.6), size = 2.2)
+
+# Try out a Sankey diagram here
+
+
+# Calculate frequency 
+
+author_country_freq <- authors_country %>%
+  group_by(Country_1,Country_2,Country_3) %>%
+  count() %>%
+  na.omit()
+
+colors <- hcl.colors(2, "Red-Blue")
+
+# Remove NA
+# Remove 
+
+ggplot(author_country_freq, aes(y = n,axis1 = Country_1, axis2 = Country_2, axis3 =Country_3)) +
+  geom_alluvium() +
+  geom_stratum() +
+ geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  #scale_fill_manual(values = colors) +
+  #scale_x_continuous(breaks = 1:3, labels = c("Hair", "Eye", "Sex")) +
+  #coord_flip() +
+  theme_void()
+
+```
+
+
+
+
